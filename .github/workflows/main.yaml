@@ -1,12 +1,13 @@
 name: main
-
 on:
-  push:
-    branches:
-      - "master"
-    tags:
-      - "v*"
-  pull_request:
+  workflow_dispatch:
+# on:
+#   push:
+#     branches:
+#       - "master"
+#     tags:
+#       - "v*"
+#   pull_request:
 
 jobs:
   # linters
@@ -36,7 +37,6 @@ jobs:
     needs: [lint-frontend, lint-backend]
     steps:
       - run: echo "done"
-
   # tests
   test-frontend:
     runs-on: ubuntu-latest
@@ -64,7 +64,6 @@ jobs:
     needs: [test-frontend, test-backend]
     steps:
       - run: echo "done"
-
   # release
   release:
     runs-on: ubuntu-latest
