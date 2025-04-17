@@ -1,0 +1,68 @@
+name: Security Tests
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+permissions:
+  checks: write
+  contents: read
+  id-token: write
+
+jobs:
+  security-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+
+      - name: Install application dependencies
+        run: |
+          cd frontend
+          pnpm install
+
+      - name: Start application
+        run: |
+          docker-compose up -d --wait
+
+      - name: Wait for application to be ready
+        run: |
+          until nc -zv 127.0.0.1 80; do echo "Waiting for application..."; sleep 5; done
+
+      - name: Set up Node.js for SecTesterJS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install SecTesterJS dependencies
+        run: |
+          cd .brightsec
+          npm install --save=false @sectester/core @sectester/repeater @sectester/scan @sectester/runner
+
+      - name: Configure Bright credentials
+        uses: ./.github/workflows/composite/configure-bright-credentials
+        with:
+          BRIGHT_HOSTNAME: development.playground.brightsec.com
+          BRIGHT_PROJECT_ID: 5VY4XBicodsJNKJtoPAmyP
+          BRIGHT_TOKEN: ${{ secrets.BRIGHT_TOKEN }}
+
+      - name: Run security tests
+        env:
+          BRIGHT_HOSTNAME: development.playground.brightsec.com
+          BRIGHT_PROJECT_ID: 5VY4XBicodsJNKJtoPAmyP
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRIGHT_TOKEN: ${{ env.BRIGHT_TOKEN }}
+          BRIGHT_TARGET_URL: http://127.0.0.1:80
+        run: |
+          node --experimental-transform-types --experimental-strip-types --experimental-detect-module \
+          --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --disable-warning=ExperimentalWarning \
+          --test-force-exit --test --test-concurrency=4 \
+          frontend/tests-examples/demo-todo-app.spec.ts frontend/tests/auth.spec.ts frontend/tests/settings.spec.ts
